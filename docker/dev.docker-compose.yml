@@ -22,7 +22,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
     AIRFLOW__CORE__FERNET_KEY: ""
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
-    AIRFLOW__CORE__LOAD_EXAMPLES: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-apiserver:8080/execution/"
     AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW__API_AUTH__JWT_SECRET:-airflow_jwt_secret}
     AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
@@ -32,12 +32,21 @@ x-airflow-common: &airflow-common
     MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
     MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
     MINIO_HOST: "http://minio:${MINIO_PORT}"
+    MANIFEST_PG_USER: ${MANIFEST_PG_USER}
+    MANIFEST_PG_DB: ${MANIFEST_PG_DB}
+    MANIFEST_PG_HOST: ${MANIFEST_PG_HOST}
+    MANIFEST_PG_PORT: ${MANIFEST_PG_PORT}
+    MANIFEST_PG_PASSWORD: ${MANIFEST_PG_PASSWORD}
+    PICKLE_PATH: ${PICKLE_PATH}
   volumes:
     - ${AIRFLOW_PROJ_DIR:?${ERROR_MESSAGE}}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:?${ERROR_MESSAGE}}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:?${ERROR_MESSAGE}}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:?${ERROR_MESSAGE}}/plugins:/opt/airflow/plugins
+    - /var/run/docker.sock:/var/run/docker.sock
   user: "${AIRFLOW_UID:-50000}:0"
+  group_add:
+    - "988"
   depends_on: &airflow-common-depends-on
     redis:
       condition: service_healthy
@@ -50,9 +59,9 @@ services:
     profiles:
       - airflow
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
+      POSTGRES_USER: ${AF_PG_USER}
+      POSTGRES_PASSWORD: ${AF_PG_PASSWORD}
+      POSTGRES_DB: ${AF_PG_DB}
     # init registry db too
     volumes:
       - dyrmgraph-dev-airflow-meta-db:/var/lib/postgresql/data
