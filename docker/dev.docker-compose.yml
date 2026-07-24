@@ -9,9 +9,6 @@ x-airflow-common: &airflow-common
   build:
     context: ${AIRFLOW_PROJ_DIR}
     dockerfile: dev.Dockerfile
-    args:
-      PROVIDERS: ${AIRFLOW_DEV_PROVIDERS:-}
-      BUILD_DEPS: ${AIRFLOW_DEV_BUILD_DEPS:-}
   env_file:
     - ${ENV_FILE_PATH:-.env}
   environment: &airflow-common-env
@@ -31,13 +28,21 @@ x-airflow-common: &airflow-common
     AIRFLOW_CONFIG: "/opt/airflow/config/airflow.cfg"
     MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
     MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-    MINIO_HOST: "http://minio:${MINIO_PORT}"
-    MANIFEST_PG_USER: ${MANIFEST_PG_USER}
-    MANIFEST_PG_DB: ${MANIFEST_PG_DB}
-    MANIFEST_PG_HOST: ${MANIFEST_PG_HOST}
-    MANIFEST_PG_PORT: ${MANIFEST_PG_PORT}
-    MANIFEST_PG_PASSWORD: ${MANIFEST_PG_PASSWORD}
+    MINIO_HOST: ${MINIO_HOST}
+    MINIO_PORT: ${MINIO_PORT}
     PICKLE_PATH: ${PICKLE_PATH}
+    AIRFLOW_UI_URL: ${AIRFLOW_UI_URL}
+    CSV_INGESTION_BUCKET: ${CSV_INGESTION_BUCKET}
+    # TODO: THESE NEED TO MOVE OUT (application bound envs) -> maybe use a secret backend?
+    # Consider aws SSM param store ... but then i would need the boto3 :( maybe it has http endpoint?
+    CSV_DOWNLOAD_PATH: ${CSV_DOWNLOAD_PATH}
+    CSV_PERM_PATH: ${CSV_PERM_PATH}
+    MANIFEST_PG_USER: ${META_PG_USER}
+    MANIFEST_PG_DB: ${META_PG_DB}
+    MANIFEST_PG_HOST: ${META_PG_HOST}
+    MANIFEST_PG_PORT: ${META_PG_PORT}
+    MANIFEST_PG_PASSWORD: ${META_PG_PASSWORD}
+    DISCORD_HOOK: ${DISCORD_HOOK}
   volumes:
     - ${AIRFLOW_PROJ_DIR:?${ERROR_MESSAGE}}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:?${ERROR_MESSAGE}}/logs:/opt/airflow/logs
@@ -54,6 +59,24 @@ x-airflow-common: &airflow-common
       condition: service_healthy
 
 services:
+  run-meta-db:
+    image: postgres:16
+    profiles:
+      - airflow
+    environment:
+      POSTGRES_USER: ${META_PG_USER}
+      POSTGRES_PASSWORD: ${META_PG_PASSWORD}
+      POSTGRES_DB: ${META_PG_DB}
+    volumes:
+      - dyrmgraph-dev-run-meta-db:/var/lib/postgresql/data
+      - ./postgres:/docker-entrypoint-initdb.d # Move init tables to here
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${META_PG_USER}", "-d", "${META_PG_DB}"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+
   postgres:
     image: postgres:16
     profiles:
@@ -62,7 +85,6 @@ services:
       POSTGRES_USER: ${AF_PG_USER}
       POSTGRES_PASSWORD: ${AF_PG_PASSWORD}
       POSTGRES_DB: ${AF_PG_DB}
-    # init registry db too
     volumes:
       - dyrmgraph-dev-airflow-meta-db:/var/lib/postgresql/data
       - ./postgres:/docker-entrypoint-initdb.d
@@ -423,7 +445,7 @@ services:
     container_name: dyrmgraph_minio
     command: server /data --console-address ":9001"
     profiles:
-      - lakehouse
+      - minio
     volumes:
       - ${WAREHOUSE_PATH:-.}:/data
     ports:
@@ -450,7 +472,7 @@ services:
         condition: service_healthy
     image: minio/mc
     profiles:
-      - lakehouse
+      - minio
     container_name: dyrmgraph_mc
     environment:
       - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
@@ -492,6 +514,7 @@ services:
 
 volumes:
   dyrmgraph-dev-airflow-meta-db:
+  dyrmgraph-dev-run-meta-db:
 
 networks:
   dyrmgraph_lakehouse_net:
