@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS transform_runs (
     queued_by TEXT,
     run_id TEXT,
     object_path TEXT,
-    version INTEGER,
+    version INTEGER DEFAULT 0,
     status TEXT,
     partition_date DATE,
     log TEXT,
