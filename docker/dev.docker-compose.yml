@@ -43,6 +43,7 @@ x-airflow-common: &airflow-common
     MANIFEST_PG_PORT: ${META_PG_PORT}
     MANIFEST_PG_PASSWORD: ${META_PG_PASSWORD}
     DISCORD_HOOK: ${DISCORD_HOOK}
+    BUCKET: ${BUCKET}
   volumes:
     - ${AIRFLOW_PROJ_DIR:?${ERROR_MESSAGE}}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:?${ERROR_MESSAGE}}/logs:/opt/airflow/logs
@@ -68,6 +69,8 @@ services:
       POSTGRES_USER: ${META_PG_USER}
       POSTGRES_PASSWORD: ${META_PG_PASSWORD}
       POSTGRES_DB: ${META_PG_DB}
+    ports:
+      - "${META_PG_PORT}:5432"
     volumes:
       - dyrmgraph-dev-run-meta-db:/var/lib/postgresql/data
       - ./postgres:/docker-entrypoint-initdb.d # Move init tables to here
@@ -88,7 +91,6 @@ services:
       POSTGRES_DB: ${AF_PG_DB}
     volumes:
       - dyrmgraph-dev-airflow-meta-db:/var/lib/postgresql/data
-      - ./postgres:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 10s
@@ -377,7 +379,9 @@ services:
       until (/usr/bin/mc alias set minio http://minio:9000 $$AWS_ACCESS_KEY_ID $$AWS_SECRET_ACCESS_KEY) do echo '...waiting...' && sleep 1; done;
       /usr/bin/mc rm -r --force minio/warehouse;
       /usr/bin/mc mb minio/warehouse;
+      /usr/bin/mc mb --ignore-existing minio/system;
       /usr/bin/mc policy set public minio/warehouse;
+      /usr/bin/mc pipe minio/system/spark-events/.keep;
       tail -f /dev/null
       "
 

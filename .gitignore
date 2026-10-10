@@ -1,3 +1,2 @@
 .env
-.kubeconfig
-.minio*
+**/warehouse/
